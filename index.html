@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mi Bachillerato · Panel académico</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-dot"></span><div><b>Mi Bachillerato</b><small>2º Bachillerato</small></div></div>
+    <nav>
+      <button class="nav active" data-view="inicio">Inicio</button>
+      <button class="nav" data-view="asignaturas">Asignaturas</button>
+      <button class="nav" data-view="calendario">Calendario</button>
+      <button class="nav" data-view="tareas">Tareas</button>
+      <button class="nav" data-view="examenes">Exámenes</button>
+      <button class="nav" data-view="calificaciones">Calificaciones</button>
+      <button class="nav" data-view="progreso">Progreso</button>
+      <button class="nav" data-view="objetivos">Objetivos</button>
+      <button class="nav" data-view="planificacion">Planificación</button>
+      <button class="nav" data-view="classroom">Classroom</button>
+    </nav>
+    <div class="sidebar-bottom">
+      <button id="themeBtn" class="nav">Cambiar tema</button>
+      <button class="nav" data-view="configuracion">Configuración</button>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <button id="menuBtn" class="mobile-menu">☰</button>
+      <div><span id="dateText"></span></div>
+      <div class="top-actions"><span class="status">● Todo guardado</span></div>
+    </header>
+    <div id="app"></div>
+  </main>
+
+<script>
+const subjects = [
+  "Historia de España","Historia de la Filosofía","Lengua Castellana y Literatura",
+  "Inglés","Matemáticas II","Biología","Química","Educación Física","Bioquímica"
+];
+
+const schedule = {
+  "Lunes":["Lengua","Biología","Filosofía","Recreo","Religión","Inglés","Bioquímica"],
+  "Martes":["Lengua","Historia","Filosofía","Recreo","Química","Matemáticas","Educación Física"],
+  "Miércoles":["Lengua","Matemáticas","Historia","Recreo","Inglés","Química","Biología"],
+  "Jueves":["Biología","Bioquímica","Matemáticas","Recreo","Química","Historia","Inglés"],
+  "Viernes":["Educación Física","Matemáticas","Química","Recreo","Biología","Filosofía","Historia"]
+};
+
+let state = JSON.parse(localStorage.getItem("bachState") || '{"tasks":[],"exams":[],"grades":{},"topics":{},"objectives":[]}');
+
+function save(){ localStorage.setItem("bachState", JSON.stringify(state)); }
+function esc(s){ return String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
+function today(){
+  const d=new Date();
+  return d.toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+}
+document.getElementById("dateText").textContent=today();
+
+function setView(view){
+  document.querySelectorAll(".nav[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+  render(view);
+}
+document.querySelectorAll(".nav[data-view]").forEach(b=>b.onclick=()=>setView(b.dataset.view));
+
+document.getElementById("themeBtn").onclick=()=>{
+  document.body.classList.toggle("dark");
+  localStorage.setItem("theme",document.body.classList.contains("dark")?"dark":"light");
+};
+if(localStorage.getItem("theme")==="dark") document.body.classList.add("dark");
+
+document.getElementById("menuBtn").onclick=()=>document.querySelector(".sidebar").classList.toggle("open");
+
+function card(title,body,cls=""){
+ return `<section class="card ${cls}"><div class="card-title"><h3>${title}</h3></div>${body}</section>`;
+}
+function progress(){
+ let vals=subjects.map(s=>state.topics[s]||0);
+ return Math.round(vals.reduce((a,b)=>a+b,0)/subjects.length);
+}
+
+function home(){
+ const pending=state.tasks.filter(t=>!t.done).slice(0,5);
+ const next=state.exams.filter(e=>e.date).sort((a,b)=>a.date.localeCompare(b.date))[0];
+ const dow=new Date().toLocaleDateString("es-ES",{weekday:"long"});
+ const classes=schedule[dow.charAt(0).toUpperCase()+dow.slice(1)]||[];
+ return `
+ <div class="page">
+  <div class="hero"><div><p class="eyebrow">PANEL ACADÉMICO</p><h1>Hola, ¿listo para estudiar?</h1><p class="muted">Aquí tienes lo importante de hoy, sin ruido.</p></div>
+  <div class="hero-progress"><b>${progress()}%</b><span>progreso general</span></div></div>
+  <div class="grid two">
+   ${card("Qué tienes hoy", `<div class="list">${pending.length?pending.map(t=>`<div class="row"><span class="check ${t.done?"done":""}"></span><div><b>${esc(t.title)}</b><small>${esc(t.subject)} · ${esc(t.due||"Sin fecha")}</small></div></div>`).join(""):"<p class='muted'>No tienes tareas pendientes.</p>"}</div><button class="linkbtn" onclick="setView('tareas')">Ver todas →</button>`)}
+   ${card("Próximo examen", next?`<div class="big-date">${new Date(next.date+"T12:00").toLocaleDateString("es-ES",{day:"2-digit",month:"short"})}</div><b>${esc(next.subject)}</b><p class="muted">${esc(next.topic||"Sin temario añadido")}</p>`:"<p class='muted'>Añade un examen para verlo aquí.</p>")}
+  </div>
+  <div class="grid three">
+   ${card("Progreso",`<div class="metric">${progress()}%</div><div class="bar"><i style="width:${progress()}%"></i></div><button class="linkbtn" onclick="setView('progreso')">Ver progreso →</button>`)}
+   ${card("Hoy en clase",classes.length?`<div class="compact-list">${classes.map((x,i)=>x==="Recreo"?`<div class="mini muted">11:15 · Recreo</div>`:`<div class="mini"><b>${["08:15","09:15","10:15","11:45","12:45","13:45"][i]||""}</b><span>${x}</span></div>`).join("")}</div>`:"<p class='muted'>No hay horario configurado.</p>")}
+   ${card("Accesos rápidos",`<div class="quick"><button onclick="setView('tareas')">+ Tarea</button><button onclick="setView('examenes')">+ Examen</button><button onclick="setView('calificaciones')">Notas</button><button onclick="setView('planificacion')">Planificar</button></div>`)}
+  </div>
+ </div>`;
+}
+
+function subjectsView(){
+ return `<div class="page"><div class="section-head"><div><p class="eyebrow">ASIGNATURAS</p><h1>Tus asignaturas</h1></div></div>
+ <div class="subject-list">${subjects.map(s=>{let p=state.topics[s]||0; return `<div class="subject" onclick="subjectDetail('${esc(s)}')"><div><b>${esc(s)}</b><small>${p}% completado</small></div><div class="subject-right"><div class="bar"><i style="width:${p}%"></i></div><span>${p}%</span></div></div>`}).join("")}</div></div>`;
+}
+function subjectDetail(s){
+ const p=state.topics[s]||0;
+ document.getElementById("app").innerHTML=`<div class="page"><button class="back" onclick="setView('asignaturas')">← Asignaturas</button><p class="eyebrow">ASIGNATURA</p><h1>${esc(s)}</h1>
+ <div class="tabs"><button class="tab active">1º trimestre</button><button class="tab">2º trimestre</button><button class="tab">3º trimestre</button></div>
+ ${card("Progreso",`<div class="metric">${p}%</div><input type="range" min="0" max="100" value="${p}" oninput="updateSubject('${esc(s)}',this.value)"><p class="muted">Arrastra para actualizar el progreso.</p>`)}
+ ${card("Temas",`<div class="topic-grid">${["Tema 1","Tema 2","Tema 3","Tema 4"].map((x,i)=>`<div class="topic"><b>${x}</b><span>${i<p/25?"Completado":"No empezado"}</span></div>`).join("")}</div>`)}
+ </div>`;
+}
+function updateSubject(s,v){state.topics[s]=+v;save();subjectDetail(s);}
+
+function tasksView(){
+ return `<div class="page"><div class="section-head"><div><p class="eyebrow">TAREAS</p><h1>Tareas</h1></div><button class="primary" onclick="addTask()">+ Nueva tarea</button></div>
+ ${state.tasks.length?`<div class="task-list">${state.tasks.map((t,i)=>`<div class="task ${t.done?"completed":""}"><button class="circle" onclick="toggleTask(${i})">${t.done?"✓":""}</button><div class="task-main"><b>${esc(t.title)}</b><small>${esc(t.subject)} · ${esc(t.due||"Sin fecha")} · ${esc(t.priority||"Normal")}</small></div><button class="delete" onclick="deleteTask(${i})">×</button></div>`).join("")}</div>`:"<div class='empty'>No hay tareas todavía.<br><button class='primary' onclick='addTask()'>Añadir la primera</button></div>"}</div>`;
+}
+function addTask(){
+ const title=prompt("Nombre de la tarea:");
+ if(!title)return;
+ const subject=prompt("Asignatura:",subjects[0])||subjects[0];
+ const due=prompt("Fecha de entrega (AAAA-MM-DD):","")||"";
+ state.tasks.push({title,subject,due,priority:"Normal",done:false});save();setView("tareas");
+}
+function toggleTask(i){state.tasks[i].done=!state.tasks[i].done;save();setView("tareas")}
+function deleteTask(i){if(confirm("¿Eliminar tarea?")){state.tasks.splice(i,1);save();setView("tareas")}}
+
+function examsView(){
+ return `<div class="page"><div class="section-head"><div><p class="eyebrow">EXÁMENES</p><h1>Próximos exámenes</h1></div><button class="primary" onclick="addExam()">+ Nuevo examen</button></div>
+ ${state.exams.length?`<div class="timeline">${state.exams.sort((a,b)=>a.date.localeCompare(b.date)).map((e,i)=>`<div class="exam"><div class="exam-date">${new Date(e.date+"T12:00").toLocaleDateString("es-ES",{day:"2-digit",month:"short"})}</div><div><b>${esc(e.subject)}</b><p>${esc(e.topic||"Sin temario")}</p></div><button class="delete" onclick="deleteExam(${i})">×</button></div>`).join("")}</div>`:"<div class='empty'>No hay exámenes registrados.</div>"}</div>`;
+}
+function addExam(){
+ const subject=prompt("Asignatura:",subjects[0])||subjects[0], date=prompt("Fecha (AAAA-MM-DD):");
+ if(!date)return; const topic=prompt("Temario:")||"";
+ state.exams.push({subject,date,topic});save();setView("examenes");
+}
+function deleteExam(i){state.exams.splice(i,1);save();setView("examenes")}
+
+function gradesView(){
+ return `<div class="page"><p class="eyebrow">CALIFICACIONES</p><h1>Calificaciones</h1><p class="muted">Introduce tus notas. El promedio se calcula automáticamente.</p>
+ <div class="grade-list">${subjects.map(s=>`<div class="grade-row"><b>${esc(s)}</b><input type="number" min="0" max="10" step=".1" value="${state.grades[s]??""}" placeholder="—" onchange="setGrade('${esc(s)}',this.value)"></div>`).join("")}</div>
+ <div class="average">Media: <b>${avg()}</b></div></div>`;
+}
+function setGrade(s,v){state.grades[s]=v===""?null:+v;save();setView("calificaciones")}
+function avg(){const a=subjects.map(s=>state.grades[s]).filter(x=>typeof x==="number");return a.length?(a.reduce((a,b)=>a+b,0)/a.length).toFixed(2):"—"}
+
+function progressView(){return `<div class="page"><p class="eyebrow">PROGRESO</p><h1>Tu progreso</h1><div class="progress-big"><b>${progress()}%</b><div class="bar"><i style="width:${progress()}%"></i></div></div>${subjects.map(s=>{let p=state.topics[s]||0;return `<div class="p-row"><span>${esc(s)}</span><div class="bar"><i style="width:${p}%"></i></div><b>${p}%</b></div>`}).join("")}</div>`}
+
+function calendarView(){return `<div class="page"><p class="eyebrow">CALENDARIO</p><h1>Horario semanal</h1><div class="schedule">${Object.entries(schedule).map(([d,items])=>`<div class="day"><h3>${d}</h3>${items.map((x,i)=>x==="Recreo"?`<div class="slot break">11:15 · Recreo</div>`:`<div class="slot"><small>${["08:15","09:15","10:15","11:45","12:45","13:45"][i]||""}</small><span>${x}</span></div>`).join("")}</div>`).join("")}</div></div>`}
+
+function planView(){return `<div class="page"><p class="eyebrow">PLANIFICACIÓN</p><h1>Plan de estudio</h1><div class="plan-box"><p class="muted">Organiza aquí tus sesiones de estudio. Tus tareas y exámenes se guardan automáticamente.</p><button class="primary" onclick="addTask()">Añadir tarea para estudiar</button><button class="secondary" onclick="setView('examenes')">Ver exámenes</button></div><div class="pomodoro"><h2>Pomodoro</h2><div id="timer">25:00</div><button class="primary" onclick="startTimer()">Empezar</button><button class="secondary" onclick="resetTimer()">Reiniciar</button></div></div>`}
+let timer=1500,timerInt=null;
+function startTimer(){if(timerInt)return;timerInt=setInterval(()=>{timer--;document.getElementById("timer").textContent=Math.floor(timer/60).toString().padStart(2,"0")+":"+String(timer%60).padStart(2,"0");if(timer<=0){clearInterval(timerInt);timerInt=null;alert("Sesión terminada.");}},1000)}
+function resetTimer(){clearInterval(timerInt);timerInt=null;timer=1500;document.getElementById("timer").textContent="25:00"}
+
+function objectivesView(){return `<div class="page"><div class="section-head"><div><p class="eyebrow">OBJETIVOS</p><h1>Objetivos</h1></div><button class="primary" onclick="addObjective()">+ Objetivo</button></div>${state.objectives.length?state.objectives.map((o,i)=>`<div class="objective"><button class="circle" onclick="doneObjective(${i})">${o.done?"✓":""}</button><b>${esc(o.text)}</b><button class="delete" onclick="state.objectives.splice(${i},1);save();setView('objetivos')">×</button></div>`).join(""):"<div class='empty'>Añade objetivos para este curso.</div>"}</div>`}
+function addObjective(){let text=prompt("Objetivo:");if(text){state.objectives.push({text,done:false});save();setView("objetivos")}}
+function doneObjective(i){state.objectives[i].done=!state.objectives[i].done;save();setView("objetivos")}
+
+function classroomView(){return `<div class="page"><p class="eyebrow">CLASSROOM</p><h1>Google Classroom</h1><p class="muted">Añade aquí tus enlaces de clase.</p>${subjects.map(s=>`<div class="class-link"><b>${esc(s)}</b><input placeholder="Pega el enlace de Classroom" onchange="localStorage.setItem('cl_'+${JSON.stringify(s)},this.value)" value="${esc(localStorage.getItem('cl_'+s)||"")}"></div>`).join("")}</div>`}
+function configView(){return `<div class="page"><p class="eyebrow">CONFIGURACIÓN</p><h1>Configuración</h1>${card("Datos","<p class='muted'>Tus tareas, notas, objetivos y progreso se guardan en este dispositivo mediante localStorage.</p><button class='secondary' onclick='exportData()'>Exportar datos</button> <button class='secondary' onclick='resetData()'>Borrar datos</button>")}</div>`}
+function exportData(){const a=document.createElement("a");a.href="data:application/json,"+encodeURIComponent(JSON.stringify(state,null,2));a.download="mi-bachillerato-datos.json";a.click()}
+function resetData(){if(confirm("¿Borrar todos tus datos?")){state={tasks:[],exams:[],grades:{},topics:{},objectives:[]};save();setView("inicio")}}
+
+function render(v){
+ if(v==="inicio")document.getElementById("app").innerHTML=home();
+ if(v==="asignaturas")document.getElementById("app").innerHTML=subjectsView();
+ if(v==="calendario")document.getElementById("app").innerHTML=calendarView();
+ if(v==="tareas")document.getElementById("app").innerHTML=tasksView();
+ if(v==="examenes")document.getElementById("app").innerHTML=examsView();
+ if(v==="calificaciones")document.getElementById("app").innerHTML=gradesView();
+ if(v==="progreso")document.getElementById("app").innerHTML=progressView();
+ if(v==="objetivos")document.getElementById("app").innerHTML=objectivesView();
+ if(v==="planificacion")document.getElementById("app").innerHTML=planView();
+ if(v==="classroom")document.getElementById("app").innerHTML=classroomView();
+ if(v==="configuracion")document.getElementById("app").innerHTML=configView();
+}
+render("inicio");
+</script>
+</body>
+</html>
